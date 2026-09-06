@@ -23,9 +23,9 @@ export const authOptions: NextAuthOptions = {
             clientSecret: process.env.GOOGLE_CLIENT_SECRET,
             authorization: {
               params: {
-                // Restricted scope: only access files created by this application
-                scope:
-                  "openid email profile https://www.googleapis.com/auth/drive.file",
+                scope: process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID
+                  ? "openid email profile https://www.googleapis.com/auth/drive"
+                  : "openid email profile https://www.googleapis.com/auth/drive.file",
                 prompt: "consent",
                 access_type: "offline",
                 response_type: "code",

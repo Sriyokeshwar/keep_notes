@@ -22,6 +22,13 @@ export async function ensureRootFolder(
   userId: string
 ): Promise<string> {
   await connectToDatabase();
+
+  const configuredFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID?.trim();
+  if (configuredFolderId) {
+    await User.findByIdAndUpdate(userId, { driveRootFolderId: configuredFolderId });
+    return configuredFolderId;
+  }
+
   const user = await User.findById(userId);
   if (user?.driveRootFolderId) {
     try {
