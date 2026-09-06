@@ -58,7 +58,7 @@ export async function GET(
       return NextResponse.json({ error: "Item has no stored file" }, { status: 404 });
     }
 
-    const storage = getStorageProvider(user.accessToken);
+    const storage = getStorageProvider(user.accessToken, user.id);
     const downloadRes = await storage.download(item.storageFileId);
 
     // Convert node readable stream to web readable stream for Next.js response

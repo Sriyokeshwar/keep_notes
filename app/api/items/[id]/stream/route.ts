@@ -52,7 +52,7 @@ export async function GET(
       }
     }
 
-    const storage = getStorageProvider(user.accessToken);
+    const storage = getStorageProvider(user.accessToken, user.id);
     const streamRes = await storage.getStream(item.storageFileId, range);
 
     const webStream = new ReadableStream({

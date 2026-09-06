@@ -173,7 +173,7 @@ export async function DELETE(
     if (item.isTrash) {
       if (item.storageFileId) {
         try {
-          const storage = getStorageProvider(user.accessToken);
+          const storage = getStorageProvider(user.accessToken, user.id);
           await storage.delete(item.storageFileId);
         } catch (storageErr) {
           console.warn("Storage deletion error:", storageErr);

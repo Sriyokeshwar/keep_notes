@@ -106,7 +106,7 @@ export async function DELETE(req: NextRequest) {
     const id = searchParams.get("id");
 
     await connectToDatabase();
-    const storage = getStorageProvider(user.accessToken);
+    const storage = getStorageProvider(user.accessToken, user.id);
 
     if (purgeAll) {
       const trashedItems = await Item.find({ ownerId: user.id, isTrash: true });

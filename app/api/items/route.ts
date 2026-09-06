@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import path from "path";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Item, IItem } from "@/lib/db/models/Item";
+import { Folder } from "@/lib/db/models/Folder";
 import { Note } from "@/lib/db/models/Note";
 import { FileVersion } from "@/lib/db/models/FileVersion";
 import { getSessionUser } from "@/lib/auth/getSessionUser";
@@ -225,7 +226,7 @@ export async function POST(req: NextRequest) {
 
     // Handle replace / new version (§12)
     if (existingDuplicate && duplicateAction === "replace") {
-      const storage = getStorageProvider(user.accessToken);
+      const storage = getStorageProvider(user.accessToken, user.id);
       const uploadRes = await storage.upload(buffer, {
         name: filename,
         mimeType,
@@ -292,10 +293,19 @@ export async function POST(req: NextRequest) {
       finalName = `${baseName} (Copy)${extName}`;
     }
 
-    const storage = getStorageProvider(user.accessToken);
+    let targetStorageFolderId: string | undefined;
+    if (folderId) {
+      const parentFolderDoc = await Folder.findById(folderId);
+      if (parentFolderDoc?.driveFolderId) {
+        targetStorageFolderId = parentFolderDoc.driveFolderId;
+      }
+    }
+
+    const storage = getStorageProvider(user.accessToken, user.id);
     const uploadRes = await storage.upload(buffer, {
       name: finalName,
       mimeType,
+      storageFolderId: targetStorageFolderId,
     });
 
     const item = await Item.create({

@@ -8,7 +8,10 @@ export * from "./google-drive";
 
 let localProviderInstance: LocalStorageProvider | null = null;
 
-export function getStorageProvider(accessToken?: string): IStorageProvider {
+export function getStorageProvider(
+  accessToken?: string,
+  userId?: string
+): IStorageProvider {
   const preferred = process.env.STORAGE_PROVIDER?.toLowerCase();
 
   if (
@@ -16,7 +19,7 @@ export function getStorageProvider(accessToken?: string): IStorageProvider {
     (accessToken || (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET))
   ) {
     try {
-      return new GoogleDriveStorageProvider(accessToken);
+      return new GoogleDriveStorageProvider(accessToken, userId);
     } catch (err) {
       console.warn("Failed to initialize Google Drive provider, falling back to LocalStorageProvider", err);
     }

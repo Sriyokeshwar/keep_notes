@@ -96,7 +96,16 @@ export const authOptions: NextAuthOptions = {
             email,
             avatar: user.image || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email)}`,
             googleId: account?.providerAccountId,
+            googleAccessToken: account?.access_token,
+            googleRefreshToken: account?.refresh_token,
+            googleTokenExpiry: account?.expires_at,
           });
+        } else if (account?.provider === "google") {
+          if (account.access_token) dbUser.googleAccessToken = account.access_token;
+          if (account.refresh_token) dbUser.googleRefreshToken = account.refresh_token;
+          if (account.expires_at) dbUser.googleTokenExpiry = account.expires_at;
+          if (account.providerAccountId) dbUser.googleId = account.providerAccountId;
+          await dbUser.save();
         }
         user.id = dbUser._id.toString();
         return true;

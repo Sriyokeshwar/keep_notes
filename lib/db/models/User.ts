@@ -6,6 +6,10 @@ export interface IUser extends Document {
   email: string;
   avatar?: string;
   googleId?: string;
+  driveRootFolderId?: string;
+  googleAccessToken?: string;
+  googleRefreshToken?: string;
+  googleTokenExpiry?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -16,6 +20,10 @@ const UserSchema = new Schema<IUser>(
     email: { type: String, required: true, unique: true, index: true, lowercase: true, trim: true },
     avatar: { type: String },
     googleId: { type: String, sparse: true },
+    driveRootFolderId: { type: String, default: null },
+    googleAccessToken: { type: String },
+    googleRefreshToken: { type: String },
+    googleTokenExpiry: { type: Number },
   },
   { timestamps: true }
 );

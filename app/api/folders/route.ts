@@ -123,9 +123,16 @@ export async function POST(req: NextRequest) {
 
     let driveFolderId: string | undefined = undefined;
     try {
-      const storage = getStorageProvider(user.accessToken);
+      let parentDriveFolderId: string | undefined;
+      if (parentId) {
+        const parentDoc = await Folder.findById(parentId);
+        if (parentDoc?.driveFolderId) {
+          parentDriveFolderId = parentDoc.driveFolderId;
+        }
+      }
+      const storage = getStorageProvider(user.accessToken, user.id);
       if (storage.createFolder) {
-        driveFolderId = await storage.createFolder(safeName);
+        driveFolderId = await storage.createFolder(safeName, parentDriveFolderId);
       }
     } catch (storageErr) {
       console.warn("Could not mirror folder to storage provider:", storageErr);

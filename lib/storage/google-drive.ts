@@ -1,5 +1,7 @@
-import { google } from "googleapis";
+import { google, drive_v3 } from "googleapis";
 import { Readable } from "stream";
+import { connectToDatabase } from "../db/connect";
+import { User } from "../db/models/User";
 import {
   IStorageProvider,
   StorageDownloadResult,
@@ -7,14 +9,100 @@ import {
   StorageUploadResult,
 } from "./types";
 
+export const ROOT_FOLDER_NAME = "Personal Knowledge Vault";
+
+/**
+ * Returns the Drive folder ID that acts as this user's app-owned storage
+ * root, creating it on first use. Because the app creates this folder
+ * itself, it's automatically covered by the drive.file scope — no Picker
+ * consent needed.
+ */
+export async function ensureRootFolder(
+  drive: drive_v3.Drive,
+  userId: string
+): Promise<string> {
+  await connectToDatabase();
+  const user = await User.findById(userId);
+  if (user?.driveRootFolderId) {
+    try {
+      const existing = await drive.files.get({
+        fileId: user.driveRootFolderId,
+        fields: "id, trashed",
+      });
+      if (!existing.data.trashed) {
+        return user.driveRootFolderId;
+      }
+    } catch {
+      // Folder was deleted or is inaccessible — fall through to recreate
+    }
+  }
+
+  const res = await drive.files.create({
+    requestBody: {
+      name: ROOT_FOLDER_NAME,
+      mimeType: "application/vnd.google-apps.folder",
+      appProperties: { app: "personal-knowledge-vault" },
+    },
+    fields: "id",
+  });
+
+  const folderId = res.data.id!;
+  await User.findByIdAndUpdate(userId, { driveRootFolderId: folderId });
+  return folderId;
+}
+
+/**
+ * Builds an authenticated Google Drive client for a given user from their
+ * stored OAuth credentials (supports offline refresh tokens).
+ */
+export async function getDriveClient(userId: string): Promise<drive_v3.Drive> {
+  await connectToDatabase();
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error(`User not found: ${userId}`);
+  }
+
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
+  );
+
+  if (user.googleRefreshToken) {
+    oauth2Client.setCredentials({
+      refresh_token: user.googleRefreshToken,
+      access_token: user.googleAccessToken,
+    });
+  } else if (user.googleAccessToken) {
+    oauth2Client.setCredentials({
+      access_token: user.googleAccessToken,
+    });
+  } else {
+    throw new Error(
+      `User ${user.email} does not have Google OAuth credentials stored. Please sign in with Google.`
+    );
+  }
+
+  return google.drive({ version: "v3", auth: oauth2Client });
+}
+
+/**
+ * Convenience helper to fetch or create the app's root folder ID for a user.
+ */
+export async function getUserRootFolderId(userId: string): Promise<string> {
+  const drive = await getDriveClient(userId);
+  return ensureRootFolder(drive, userId);
+}
+
 export class GoogleDriveStorageProvider implements IStorageProvider {
   readonly name = "google_drive" as const;
   private authClient: ReturnType<typeof google.auth.fromJSON> | null = null;
-  private drive: ReturnType<typeof google.drive> | null = null;
+  private drive: drive_v3.Drive | null = null;
   private accessToken?: string;
+  private userId?: string;
 
-  constructor(accessToken?: string) {
+  constructor(accessToken?: string, userId?: string) {
     this.accessToken = accessToken;
+    this.userId = userId;
     this.initDrive();
   }
 
@@ -57,11 +145,20 @@ export class GoogleDriveStorageProvider implements IStorageProvider {
     stream.push(buffer);
     stream.push(null);
 
+    let parentFolderId = metadata.storageFolderId;
+    if (!parentFolderId && this.userId) {
+      try {
+        parentFolderId = await ensureRootFolder(drive, this.userId);
+      } catch (err) {
+        console.warn("Could not ensure root folder in Drive:", err);
+      }
+    }
+
     const fileMetadata: { name: string; parents?: string[] } = {
       name: metadata.name,
     };
-    if (metadata.storageFolderId) {
-      fileMetadata.parents = [metadata.storageFolderId];
+    if (parentFolderId) {
+      fileMetadata.parents = [parentFolderId];
     }
 
     const response = await drive.files.create({
@@ -162,12 +259,22 @@ export class GoogleDriveStorageProvider implements IStorageProvider {
     parentStorageFolderId?: string
   ): Promise<string> {
     const drive = this.ensureDrive();
+
+    let parentId = parentStorageFolderId;
+    if (!parentId && this.userId) {
+      try {
+        parentId = await ensureRootFolder(drive, this.userId);
+      } catch (err) {
+        console.warn("Could not ensure root folder for folder creation:", err);
+      }
+    }
+
     const fileMetadata: { name: string; mimeType: string; parents?: string[] } = {
       name,
       mimeType: "application/vnd.google-apps.folder",
     };
-    if (parentStorageFolderId) {
-      fileMetadata.parents = [parentStorageFolderId];
+    if (parentId) {
+      fileMetadata.parents = [parentId];
     }
 
     const response = await drive.files.create({
