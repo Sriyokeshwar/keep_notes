@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useVault, VaultItem } from "@/components/providers/VaultContext";
+import { useVault } from "@/components/providers/VaultContext";
 import { useTheme } from "@/components/providers/ThemeProvider";
 import { Z_INDEX } from "@/lib/tokens/zIndex";
 import {
@@ -15,33 +15,30 @@ import {
   Link as LinkIcon,
   Upload,
   ArrowUpDown,
-  FileText,
-  Image as ImageIcon,
-  Film,
-  Music,
   ChevronRight,
-  ExternalLink,
-  X,
   Sun,
   Moon,
   Laptop,
+  Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function Topbar() {
+interface TopbarProps {
+  onOpenSearch?: () => void;
+  onOpenMobileMenu?: () => void;
+}
+
+export function Topbar({ onOpenSearch, onOpenMobileMenu }: TopbarProps) {
   const {
     breadcrumbs,
     currentFolder,
     viewMode,
     setViewMode,
-    filterType,
-    setFilterType,
     sortBy,
     setSortBy,
     sortOrder,
     setSortOrder,
     openNoteEditor,
-    openPreview,
     setIsNewFolderOpen,
     setIsSaveLinkOpen,
     uploadFiles,
@@ -51,337 +48,281 @@ export function Topbar() {
 
   // Create menu popover state
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const createMenuRef = useRef<HTMLDivElement>(null);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Global search state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<{ folders: any[]; items: VaultItem[] } | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
-
-  // Close create menu when clicking outside
+  // Close menus when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (createMenuRef.current && !createMenuRef.current.contains(e.target as Node)) {
         setIsCreateMenuOpen(false);
       }
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setSearchResults(null);
+      if (sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)) {
+        setIsSortMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Debounced search query
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults(null);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
-        if (res.ok) {
-          const data = await res.json();
-          setSearchResults(data);
-        }
-      } catch (err) {
-        console.error("Search error:", err);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      uploadFiles(e.target.files);
-      e.target.value = "";
-    }
-  };
-
   return (
-    <header
-      style={{ zIndex: Z_INDEX.stickyChrome }}
-      className="h-16 border-b border-[var(--border)] bg-[var(--surface-primary)] px-6 flex items-center justify-between gap-4 sticky top-0 transition-colors duration-150"
-    >
-      {/* Left: Breadcrumbs navigation */}
-      <div className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] min-w-0 flex-shrink">
-        <Link
-          href="/vault"
-          className="hover:text-[var(--text-primary)] font-medium transition-colors"
-        >
-          Home
-        </Link>
-        {breadcrumbs.map((b, idx) => (
-          <React.Fragment key={b.id}>
-            <ChevronRight className="w-3.5 h-3.5 text-[var(--text-faint)] flex-shrink-0" />
-            <Link
-              href={`/vault/${b.id}`}
-              className={cn(
-                "truncate max-w-[140px] hover:text-[var(--text-primary)] transition-colors",
-                idx === breadcrumbs.length - 1
-                  ? "font-semibold text-[var(--text-primary)]"
-                  : ""
-              )}
-            >
-              {b.name}
-            </Link>
-          </React.Fragment>
-        ))}
-      </div>
+    <header className="h-16 px-4 md:px-6 border-b border-[var(--border)] glass-panel flex items-center justify-between gap-4 sticky top-0 select-none z-10 transition-colors">
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        multiple
+        onChange={(e) => {
+          if (e.target.files) {
+            uploadFiles(Array.from(e.target.files));
+          }
+        }}
+      />
 
-      {/* Center: Global Search Bar */}
-      <div ref={searchRef} className="relative flex-1 max-w-md">
-        <div className="relative flex items-center">
-          <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search files, notes, tags..."
-            className="w-full pl-9 pr-8 py-1.5 bg-[var(--surface-ground)] border border-[var(--border)] rounded-full text-xs text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] transition-all"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => {
-                setSearchQuery("");
-                setSearchResults(null);
-              }}
-              className="absolute right-2.5 p-0.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        {/* Search Results Dropdown */}
-        {searchResults && (
-          <div
-            style={{ zIndex: Z_INDEX.dropdowns }}
-            className="absolute left-0 right-0 top-full mt-2 bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl shadow-[var(--shadow-popover)] p-2 max-h-96 overflow-y-auto"
+      {/* Left: Mobile Menu Trigger + Breadcrumbs */}
+      <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-initial">
+        {onOpenMobileMenu && (
+          <button
+            onClick={onOpenMobileMenu}
+            aria-label="Open navigation menu"
+            className="md:hidden p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors flex-shrink-0"
           >
-            {isSearching ? (
-              <div className="p-4 text-center text-xs text-[var(--text-muted)]">
-                Searching vault...
-              </div>
-            ) : searchResults.folders.length === 0 && searchResults.items.length === 0 ? (
-              <div className="p-4 text-center text-xs text-[var(--text-muted)]">
-                No results found for &ldquo;{searchQuery}&rdquo;
-              </div>
-            ) : (
-              <>
-                {searchResults.folders.length > 0 && (
-                  <div className="mb-2">
-                    <div className="px-2 py-1 text-[11px] font-medium text-[var(--text-muted)]">
-                      Folders
-                    </div>
-                    {searchResults.folders.map((f) => (
-                      <Link
-                        key={f._id}
-                        href={`/vault/${f._id}`}
-                        onClick={() => setSearchResults(null)}
-                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs hover:bg-[var(--surface-hover)] text-[var(--text-primary)] transition"
-                      >
-                        <FolderPlus className="w-3.5 h-3.5 text-[var(--accent)]" />
-                        <span className="font-medium truncate">{f.name}</span>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-                {searchResults.items.length > 0 && (
-                  <div>
-                    <div className="px-2 py-1 text-[11px] font-medium text-[var(--text-muted)]">
-                      Files & Notes
-                    </div>
-                    {searchResults.items.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          setSearchResults(null);
-                          if (item.type === "note") openNoteEditor(item);
-                          else openPreview(item);
-                        }}
-                        className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-[var(--surface-hover)] text-[var(--text-primary)] transition text-left"
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          {item.type === "note" ? (
-                            <StickyNote className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                          ) : (
-                            <FileText className="w-3.5 h-3.5 text-[var(--accent)]" />
-                          )}
-                          <span className="truncate">{item.name}</span>
-                        </div>
-                        <span className="text-[10px] text-[var(--text-muted)] capitalize">{item.type}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+            <Menu className="w-5 h-5" />
+          </button>
         )}
+
+        <nav aria-label="Breadcrumbs" className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)] overflow-hidden">
+          <Link
+            href="/vault"
+            className="hover:text-[var(--text-primary)] transition-colors whitespace-nowrap"
+          >
+            Vault
+          </Link>
+          {breadcrumbs.map((b) => (
+            <React.Fragment key={b.id}>
+              <ChevronRight className="w-3.5 h-3.5 text-[var(--text-faint)] flex-shrink-0" />
+              <Link
+                href={`/vault/${b.id}`}
+                className={cn(
+                  "truncate max-w-[120px] transition-colors",
+                  b.id === currentFolder?.id
+                    ? "text-[var(--text-primary)] font-semibold"
+                    : "hover:text-[var(--text-primary)]"
+                )}
+              >
+                {b.name}
+              </Link>
+            </React.Fragment>
+          ))}
+        </nav>
       </div>
 
-      {/* Right: Actions, Filters, Theme toggle & Create button */}
-      <div className="flex items-center gap-2">
-        {/* Filter Type Pills */}
-        <div className="hidden lg:flex items-center bg-[var(--surface-ground)] border border-[var(--border-subtle)] p-0.5 rounded-lg text-xs">
-          {(["all", "note", "file", "link"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setFilterType(t)}
-              className={cn(
-                "px-2.5 py-1 rounded-md capitalize font-medium transition-all",
-                filterType === t
-                  ? "bg-[var(--surface-primary)] text-[var(--text-primary)] shadow-xs"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-              )}
-            >
-              {t === "all" ? "All" : t === "note" ? "Notes" : t === "file" ? "Files" : "Links"}
-            </button>
-          ))}
-        </div>
+      {/* Center: Global Command Palette Pill */}
+      <div className="flex-1 max-w-md hidden sm:flex justify-center">
+        <button
+          onClick={onOpenSearch}
+          className="w-full flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[var(--surface-ground)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-xs text-[var(--text-muted)] transition-all shadow-2xs group"
+        >
+          <Search className="w-4 h-4 text-[var(--text-faint)] group-hover:text-[var(--accent)] transition-colors flex-shrink-0" />
+          <span className="flex-1 text-left truncate">Search notes, files, actions...</span>
+          <kbd className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-primary)] border border-[var(--border)] text-[var(--text-muted)] flex-shrink-0">
+            ⌘K
+          </kbd>
+        </button>
+      </div>
 
-        {/* Sort Select */}
-        <div className="flex items-center border border-[var(--border)] bg-[var(--surface-primary)] rounded-lg px-2 py-1 text-xs gap-1">
-          <ArrowUpDown className="w-3 h-3 text-[var(--text-muted)]" />
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="bg-transparent text-[var(--text-primary)] focus:outline-none cursor-pointer"
-          >
-            <option value="created">Created</option>
-            <option value="modified">Modified</option>
-            <option value="name">Name</option>
-            <option value="size">Size</option>
-          </select>
+      {/* Right: Actions, Sort, View, Theme */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Mobile Search Icon button */}
+        {onOpenSearch && (
           <button
-            onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-            className="text-[10px] font-mono px-1 hover:text-[var(--accent)] transition"
+            onClick={onOpenSearch}
+            className="sm:hidden p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
           >
-            {sortOrder === "asc" ? "▲" : "▼"}
+            <Search className="w-4 h-4" />
           </button>
-        </div>
+        )}
 
-        {/* View mode toggle (Grid / List) */}
-        <div className="flex items-center border border-[var(--border)] bg-[var(--surface-primary)] rounded-lg p-0.5">
-          <button
-            onClick={() => setViewMode("grid")}
-            title="Grid view"
-            className={cn(
-              "p-1 rounded-md transition",
-              viewMode === "grid"
-                ? "bg-[var(--surface-hover)] text-[var(--text-primary)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            )}
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => setViewMode("list")}
-            title="List view"
-            className={cn(
-              "p-1 rounded-md transition",
-              viewMode === "list"
-                ? "bg-[var(--surface-hover)] text-[var(--text-primary)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            )}
-          >
-            <List className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {/* Theme Switcher Toggle (Light / Dark / System) */}
-        <div className="flex items-center border border-[var(--border)] bg-[var(--surface-primary)] rounded-lg p-0.5">
-          <button
-            onClick={() => {
-              if (theme === "system") setTheme("light");
-              else if (theme === "light") setTheme("dark");
-              else setTheme("system");
-            }}
-            title={`Current theme: ${theme}. Click to cycle.`}
-            className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition flex items-center gap-1 text-xs"
-          >
-            {theme === "light" && <Sun className="w-3.5 h-3.5 text-amber-600" />}
-            {theme === "dark" && <Moon className="w-3.5 h-3.5 text-[var(--accent)]" />}
-            {theme === "system" && <Laptop className="w-3.5 h-3.5" />}
-          </button>
-        </div>
-
-        {/* Hidden file input for uploads */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          onChange={handleFileUpload}
-          className="hidden"
-        />
-
-        {/* Prominent + Create Menu */}
-        <div ref={createMenuRef} className="relative">
+        {/* Create + Menu */}
+        <div className="relative" ref={createMenuRef}>
           <button
             onClick={() => setIsCreateMenuOpen(!isCreateMenuOpen)}
-            className="flex items-center gap-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-fg)] px-3 py-1.5 rounded-lg text-xs font-medium shadow-xs transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-fg)] rounded-xl text-xs font-medium shadow-xs transition-colors"
           >
-            <Plus className="w-4 h-4" />
-            <span>New</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">New</span>
           </button>
 
           {isCreateMenuOpen && (
             <div
               style={{ zIndex: Z_INDEX.dropdowns }}
-              className="absolute right-0 top-full mt-1.5 w-48 bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl shadow-[var(--shadow-popover)] p-1.5 space-y-0.5"
+              className="absolute right-0 top-full mt-1.5 w-44 rounded-xl glass-modal p-1.5 text-xs text-[var(--text-primary)] modal-morph-enter"
             >
               <button
                 onClick={() => {
                   setIsCreateMenuOpen(false);
                   openNoteEditor();
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition text-left"
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-hover)] text-left transition-colors"
               >
-                <StickyNote className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <StickyNote className="w-4 h-4 text-[var(--accent)]" />
                 <span>New Note</span>
               </button>
+
               <button
                 onClick={() => {
                   setIsCreateMenuOpen(false);
                   setIsNewFolderOpen(true);
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition text-left"
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-hover)] text-left transition-colors"
               >
-                <FolderPlus className="w-4 h-4 text-[var(--accent)]" />
+                <FolderPlus className="w-4 h-4 text-blue-500" />
                 <span>New Folder</span>
               </button>
-              <button
-                onClick={() => {
-                  setIsCreateMenuOpen(false);
-                  setIsSaveLinkOpen(true);
-                }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition text-left"
-              >
-                <LinkIcon className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-                <span>Save Link</span>
-              </button>
-              <div className="h-px bg-[var(--border-subtle)] my-1" />
+
               <button
                 onClick={() => {
                   setIsCreateMenuOpen(false);
                   fileInputRef.current?.click();
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition text-left"
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-hover)] text-left transition-colors"
               >
-                <Upload className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <Upload className="w-4 h-4 text-emerald-500" />
                 <span>Upload Files</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsCreateMenuOpen(false);
+                  setIsSaveLinkOpen(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-hover)] text-left transition-colors"
+              >
+                <LinkIcon className="w-4 h-4 text-violet-500" />
+                <span>Bookmark Link</span>
               </button>
             </div>
           )}
+        </div>
+
+        {/* Sort Menu */}
+        <div className="relative hidden md:block" ref={sortMenuRef}>
+          <button
+            onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
+            className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors border border-transparent hover:border-[var(--border)]"
+            title="Sort options"
+          >
+            <ArrowUpDown className="w-4 h-4" />
+          </button>
+
+          {isSortMenuOpen && (
+            <div
+              style={{ zIndex: Z_INDEX.dropdowns }}
+              className="absolute right-0 top-full mt-1.5 w-40 rounded-xl glass-modal p-1.5 text-xs text-[var(--text-primary)] modal-morph-enter"
+            >
+              {[
+                { label: "Name", val: "name" },
+                { label: "Date Created", val: "created" },
+                { label: "Date Modified", val: "modified" },
+                { label: "Size", val: "size" },
+              ].map((s) => (
+                <button
+                  key={s.val}
+                  onClick={() => {
+                    if (sortBy === s.val) {
+                      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                    } else {
+                      setSortBy(s.val as any);
+                    }
+                    setIsSortMenuOpen(false);
+                  }}
+                  className={cn(
+                    "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors",
+                    sortBy === s.val
+                      ? "bg-[var(--accent-subtle)] text-[var(--accent)] font-semibold"
+                      : "hover:bg-[var(--surface-hover)]"
+                  )}
+                >
+                  <span>{s.label}</span>
+                  {sortBy === s.val && (
+                    <span className="text-[10px] text-[var(--accent)]">
+                      {sortOrder === "asc" ? "↑" : "↓"}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* View Mode Toggle */}
+        <div className="hidden sm:flex items-center bg-[var(--surface-ground)] border border-[var(--border)] rounded-xl p-0.5">
+          <button
+            onClick={() => setViewMode("grid")}
+            aria-label="Grid view"
+            className={cn(
+              "p-1.5 rounded-lg transition-colors",
+              viewMode === "grid"
+                ? "bg-[var(--surface-primary)] text-[var(--text-primary)] shadow-2xs"
+                : "text-[var(--text-faint)] hover:text-[var(--text-primary)]"
+            )}
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setViewMode("list")}
+            aria-label="List view"
+            className={cn(
+              "p-1.5 rounded-lg transition-colors",
+              viewMode === "list"
+                ? "bg-[var(--surface-primary)] text-[var(--text-primary)] shadow-2xs"
+                : "text-[var(--text-faint)] hover:text-[var(--text-primary)]"
+            )}
+          >
+            <List className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Theme Selector (Sun / Moon / Laptop) */}
+        <div className="flex items-center bg-[var(--surface-ground)] border border-[var(--border)] rounded-xl p-0.5">
+          <button
+            onClick={() => setTheme("light")}
+            aria-label="Light mode"
+            className={cn(
+              "p-1.5 rounded-lg transition-colors",
+              theme === "light"
+                ? "bg-[var(--surface-primary)] text-[var(--text-primary)] shadow-2xs"
+                : "text-[var(--text-faint)] hover:text-[var(--text-primary)]"
+            )}
+          >
+            <Sun className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setTheme("dark")}
+            aria-label="Dark mode"
+            className={cn(
+              "p-1.5 rounded-lg transition-colors",
+              theme === "dark"
+                ? "bg-[var(--surface-primary)] text-[var(--text-primary)] shadow-2xs"
+                : "text-[var(--text-faint)] hover:text-[var(--text-primary)]"
+            )}
+          >
+            <Moon className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setTheme("system")}
+            aria-label="System mode"
+            className={cn(
+              "p-1.5 rounded-lg transition-colors",
+              theme === "system"
+                ? "bg-[var(--surface-primary)] text-[var(--text-primary)] shadow-2xs"
+                : "text-[var(--text-faint)] hover:text-[var(--text-primary)]"
+            )}
+          >
+            <Laptop className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
     </header>

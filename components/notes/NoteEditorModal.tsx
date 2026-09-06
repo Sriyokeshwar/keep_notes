@@ -222,13 +222,14 @@ export function NoteEditorModal() {
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const charCount = content.length;
+  const readingTime = Math.max(1, Math.ceil(wordCount / 200));
   const activeColors = resolveNoteColors(color, isDark);
 
   return (
     <>
       <div
         style={{ zIndex: Z_INDEX.modalBackdrop }}
-        className="fixed inset-0 flex items-center justify-center bg-black/45 dark:bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+        className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-150"
       >
         <div
           style={{
@@ -237,10 +238,10 @@ export function NoteEditorModal() {
             borderColor: activeColors.border,
           }}
           className={cn(
-            "w-full rounded-2xl shadow-[var(--shadow-modal)] border flex flex-col transition-all duration-200 overflow-hidden modal-morph-enter",
+            "w-full flex flex-col transition-all duration-200 overflow-hidden modal-morph-enter shadow-[var(--shadow-modal)]",
             isFullScreen
-              ? "fixed inset-3 max-w-none max-h-none h-[calc(100vh-24px)]"
-              : "max-w-2xl max-h-[85vh] h-[550px]"
+              ? "fixed inset-0 sm:inset-3 rounded-none sm:rounded-3xl max-w-none max-h-none h-full sm:h-[calc(100vh-24px)]"
+              : "max-sm:fixed max-sm:inset-0 max-sm:rounded-none max-sm:h-full sm:rounded-3xl sm:max-w-2xl sm:max-h-[85vh] sm:h-[580px] border sm:border"
           )}
         >
           {/* Header Bar */}
@@ -454,7 +455,7 @@ export function NoteEditorModal() {
             {/* Right: Word/character count & Close */}
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-[var(--text-faint)] font-mono hidden sm:inline">
-                {wordCount} words · {charCount} chars
+                {wordCount} words · {charCount} chars · {readingTime}m read
               </span>
               <button
                 onClick={handleClose}
